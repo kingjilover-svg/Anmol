@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile, plan tier, role, and usage counters.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the user." },
+        "email": { "type": "string", "description": "User email address." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "photoUrl": { "type": "string", "description": "Optional avatar URL." },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "RBAC role." },
+        "planTier": { "type": "string", "enum": ["starter", "pro", "team"], "description": "Active plan tier." },
+        "lastActiveConversationId": { "type": "string", "description": "Most recently opened conversation ID." },
+        "messageCount": { "type": "integer", "description": "Total user messages sent." },
+        "imageCount": { "type": "integer", "description": "Total studio images generated." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["userId", "displayName", "role", "planTier", "messageCount", "imageCount", "createdAt", "updatedAt"]
+    },
+    "AdminMarker": {
+      "title": "AdminMarker",
+      "description": "Trusted admin role marker document.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Admin UID." },
+        "email": { "type": "string", "description": "Admin email." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "Color-tagged workspace folder for organizing conversations.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "colorKey": { "type": "string", "enum": ["cobalt", "emerald", "amber", "rose", "violet", "slate"] },
+        "sortOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "colorKey", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Multi-turn AI chat conversation metadata.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "folderId": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "modelId": { "type": "string" },
+        "personaId": { "type": "string" },
+        "lastMessagePreview": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "pinned", "modelId", "personaId", "lastMessagePreview", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Single user or model turn within a conversation.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "attachments": { "type": "array" },
+        "reaction": { "type": "string", "enum": ["none", "liked", "disliked"] },
+        "followUps": { "type": "array" },
+        "partialTimeout": { "type": "boolean" },
+        "sequenceIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "conversationId", "role", "content", "attachments", "reaction", "followUps", "partialTimeout", "sequenceIndex", "createdAt", "updatedAt"]
+    },
+    "Persona": {
+      "title": "Persona",
+      "description": "Custom or preset AI system-instruction persona.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "tagline": { "type": "string" },
+        "systemInstruction": { "type": "string" },
+        "builtIn": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "tagline", "systemInstruction", "builtIn", "createdAt", "updatedAt"]
+    },
+    "MemoryEntry": {
+      "title": "MemoryEntry",
+      "description": "Persistent AI Memory Bank instruction.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "category": { "type": "string", "enum": ["Preference", "Project", "Bio & Role", "Style"] },
+        "content": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "category", "content", "enabled", "createdAt", "updatedAt"]
+    },
+    "BookmarkSnippet": {
+      "title": "BookmarkSnippet",
+      "description": "Bookmarked assistant answer or reusable prompt/code snippet.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "kind": { "type": "string", "enum": ["answer", "snippet"] },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "language": { "type": "string" },
+        "sourceConversationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "kind", "title", "content", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user profile, role, plan tier, and usage overview."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminMarker" },
+      "description": "Trusted admin role registry."
+    },
+    "/users/{userId}/folders/{folderId}": {
+      "schema": { "$ref": "#/entities/Folder" },
+      "description": "User workspace folders."
+    },
+    "/users/{userId}/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "User chat conversations."
+    },
+    "/users/{userId}/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages inside a user conversation."
+    },
+    "/users/{userId}/personas/{personaId}": {
+      "schema": { "$ref": "#/entities/Persona" },
+      "description": "User custom and synced personas."
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": { "$ref": "#/entities/MemoryEntry" },
+      "description": "User AI Memory Bank entries."
+    },
+    "/users/{userId}/bookmarks/{bookmarkId}": {
+      "schema": { "$ref": "#/entities/BookmarkSnippet" },
+      "description": "User bookmarked answers and prompt/code snippets."
+    }
+  }
+}

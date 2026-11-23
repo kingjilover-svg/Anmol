@@ -1,0 +1,6 @@
+{
+  "name": "UNKNOWN AI",
+  "description": "Multimodal Gemini AI workspace with streaming chat, voice conversation, developer diff tools, Image Studio, and offline-first Guest Mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,268 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+        'email_verified' in request.auth.token &&
+        request.auth.token.email_verified == true &&
+        'email' in request.auth.token &&
+        request.auth.token.email == 'u4115518@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() ||
+        (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // --- Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.role in ['user', 'admin'] &&
+        data.planTier in ['starter', 'pro', 'team'] &&
+        data.messageCount is int && data.messageCount >= 0 &&
+        data.imageCount is int && data.imageCount >= 0 &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+        (!('lastActiveConversationId' in data) || (data.lastActiveConversationId is string && data.lastActiveConversationId.size() <= 128)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidAdminMarker(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidFolder(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+        data.colorKey in ['cobalt', 'emerald', 'amber', 'rose', 'violet', 'slate'] &&
+        data.sortOrder is int && data.sortOrder >= 0 &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidConversation(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        (!('folderId' in data) || (data.folderId is string && data.folderId.size() <= 128)) &&
+        data.pinned is bool &&
+        data.modelId is string && data.modelId.size() >= 1 && data.modelId.size() <= 64 &&
+        data.personaId is string && data.personaId.size() >= 1 && data.personaId.size() <= 128 &&
+        data.lastMessagePreview is string && data.lastMessagePreview.size() <= 300 &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.conversationId is string && data.conversationId.size() >= 1 && data.conversationId.size() <= 128 &&
+        data.role in ['user', 'model'] &&
+        data.content is string && data.content.size() <= 100000 &&
+        data.attachments is list && data.attachments.size() <= 10 &&
+        (data.attachments.size() == 0 || data.attachments[0] is string) &&
+        data.reaction in ['none', 'liked', 'disliked'] &&
+        data.followUps is list && data.followUps.size() <= 4 &&
+        (data.followUps.size() == 0 || data.followUps[0] is string) &&
+        data.partialTimeout is bool &&
+        data.sequenceIndex is int && data.sequenceIndex >= 0 &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPersona(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+        data.tagline is string && data.tagline.size() <= 140 &&
+        data.systemInstruction is string && data.systemInstruction.size() >= 1 && data.systemInstruction.size() <= 4000 &&
+        data.builtIn is bool &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMemoryEntry(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.category in ['Preference', 'Project', 'Bio & Role', 'Style'] &&
+        data.content is string && data.content.size() >= 1 && data.content.size() <= 1000 &&
+        data.enabled is bool &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBookmarkSnippet(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.kind in ['answer', 'snippet'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.content is string && data.content.size() >= 1 && data.content.size() <= 30000 &&
+        (!('language' in data) || (data.language is string && data.language.size() <= 40)) &&
+        (!('sourceConversationId' in data) || (data.sourceConversationId is string && data.sourceConversationId.size() <= 128)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- Admin Registry ---
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && (isOwner(uid) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isValidId(uid) && isAdmin() &&
+        incoming().uid == uid &&
+        incoming().keys().hasAll(['uid', 'email', 'createdAt']) &&
+        incoming().keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        isValidAdminMarker(incoming());
+      allow delete: if isValidId(uid) && isAdmin();
+    }
+
+    // --- User Profiles & Scoped Subcollections ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isValidId(userId) && isOwner(userId) &&
+        incoming().userId == request.auth.uid &&
+        (incoming().role == 'user' || isAdmin()) &&
+        incoming().keys().hasAll(['userId', 'displayName', 'role', 'planTier', 'messageCount', 'imageCount', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'email', 'displayName', 'photoUrl', 'role', 'planTier', 'lastActiveConversationId', 'messageCount', 'imageCount', 'createdAt', 'updatedAt']) &&
+        isValidUserProfile(incoming());
+
+      allow update: if isValidId(userId) && isSignedIn() &&
+        isValidUserProfile(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt && (
+          isAdmin() ||
+          (isOwner(userId) &&
+           incoming().role == existing().role &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoUrl', 'planTier', 'lastActiveConversationId', 'messageCount', 'imageCount', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      match /folders/{folderId} {
+        allow get: if isValidId(userId) && isValidId(folderId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isValidId(folderId) && isOwner(userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll(['userId', 'name', 'colorKey', 'sortOrder', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'name', 'colorKey', 'sortOrder', 'createdAt', 'updatedAt']) &&
+          isValidFolder(incoming());
+        allow update: if isValidId(userId) && isValidId(folderId) && isOwner(userId) &&
+          isValidFolder(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'colorKey', 'sortOrder', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(folderId) && isOwner(userId);
+      }
+
+      match /conversations/{conversationId} {
+        allow get: if isValidId(userId) && isValidId(conversationId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isValidId(conversationId) && isOwner(userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll(['userId', 'title', 'pinned', 'modelId', 'personaId', 'lastMessagePreview', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'title', 'folderId', 'pinned', 'modelId', 'personaId', 'lastMessagePreview', 'createdAt', 'updatedAt']) &&
+          isValidConversation(incoming());
+        allow update: if isValidId(userId) && isValidId(conversationId) && isOwner(userId) &&
+          isValidConversation(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'folderId', 'pinned', 'modelId', 'personaId', 'lastMessagePreview', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(conversationId) && isOwner(userId);
+
+        match /messages/{messageId} {
+          allow get: if isValidId(userId) && isValidId(conversationId) && isValidId(messageId) && isOwner(userId);
+          allow list: if isValidId(userId) && isValidId(conversationId) && isOwner(userId);
+          allow create: if isValidId(userId) && isValidId(conversationId) && isValidId(messageId) && isOwner(userId) &&
+            incoming().userId == request.auth.uid &&
+            incoming().conversationId == conversationId &&
+            incoming().keys().hasAll(['userId', 'conversationId', 'role', 'content', 'attachments', 'reaction', 'followUps', 'partialTimeout', 'sequenceIndex', 'createdAt', 'updatedAt']) &&
+            incoming().keys().hasOnly(['userId', 'conversationId', 'role', 'content', 'attachments', 'reaction', 'followUps', 'partialTimeout', 'sequenceIndex', 'createdAt', 'updatedAt']) &&
+            isValidChatMessage(incoming());
+          allow update: if isValidId(userId) && isValidId(conversationId) && isValidId(messageId) && isOwner(userId) &&
+            isValidChatMessage(incoming()) &&
+            incoming().userId == existing().userId &&
+            incoming().conversationId == existing().conversationId &&
+            incoming().role == existing().role &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['content', 'attachments', 'reaction', 'followUps', 'partialTimeout', 'sequenceIndex', 'updatedAt']);
+          allow delete: if isValidId(userId) && isValidId(conversationId) && isValidId(messageId) && isOwner(userId);
+        }
+      }
+
+      match /personas/{personaId} {
+        allow get: if isValidId(userId) && isValidId(personaId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isValidId(personaId) && isOwner(userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll(['userId', 'name', 'tagline', 'systemInstruction', 'builtIn', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'name', 'tagline', 'systemInstruction', 'builtIn', 'createdAt', 'updatedAt']) &&
+          isValidPersona(incoming());
+        allow update: if isValidId(userId) && isValidId(personaId) && isOwner(userId) &&
+          isValidPersona(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'tagline', 'systemInstruction', 'builtIn', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(personaId) && isOwner(userId);
+      }
+
+      match /memories/{memoryId} {
+        allow get: if isValidId(userId) && isValidId(memoryId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isValidId(memoryId) && isOwner(userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll(['userId', 'category', 'content', 'enabled', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'category', 'content', 'enabled', 'createdAt', 'updatedAt']) &&
+          isValidMemoryEntry(incoming());
+        allow update: if isValidId(userId) && isValidId(memoryId) && isOwner(userId) &&
+          isValidMemoryEntry(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['category', 'content', 'enabled', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(memoryId) && isOwner(userId);
+      }
+
+      match /bookmarks/{bookmarkId} {
+        allow get: if isValidId(userId) && isValidId(bookmarkId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create: if isValidId(userId) && isValidId(bookmarkId) && isOwner(userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll(['userId', 'kind', 'title', 'content', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'kind', 'title', 'content', 'language', 'sourceConversationId', 'createdAt', 'updatedAt']) &&
+          isValidBookmarkSnippet(incoming());
+        allow update: if isValidId(userId) && isValidId(bookmarkId) && isOwner(userId) &&
+          isValidBookmarkSnippet(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['kind', 'title', 'content', 'language', 'sourceConversationId', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(bookmarkId) && isOwner(userId);
+      }
+    }
+  }
+}
